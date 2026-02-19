@@ -1,32 +1,43 @@
 import { useState, useCallback, useRef } from "react";
 
-const MIN_COLUMNS = 2;
-const MAX_COLUMNS = 8;
+export const SIZE_PRESETS = [
+  { columns: 2, label: "XL" },
+  { columns: 4, label: "L" },
+  { columns: 6, label: "M" },
+  { columns: 8, label: "S" },
+] as const;
 
-export function usePinchGrid(initialColumns = 4) {
-  const [columns, setColumns] = useState(initialColumns);
-  const lastScale = useRef(1);
+export type SizePreset = (typeof SIZE_PRESETS)[number];
+
+export function usePinchGrid(initialIndex = 1) {
+  const [presetIndex, setPresetIndex] = useState(initialIndex);
+  const lastScale = useRef(0);
+
+  const columns = SIZE_PRESETS[presetIndex].columns;
+  const currentPreset = SIZE_PRESETS[presetIndex];
+
+  const setPresetByIndex = useCallback((idx: number) => {
+    setPresetIndex(Math.max(0, Math.min(SIZE_PRESETS.length - 1, idx)));
+  }, []);
 
   const onPinch = useCallback(
     ({ delta, first }: { delta: [number, number]; first: boolean }) => {
       if (first) {
-        lastScale.current = 1;
+        lastScale.current = 0;
       }
-      const scaleDelta = delta[0];
-      lastScale.current += scaleDelta;
+      lastScale.current += delta[0];
 
-      // Pinch out (zoom in) = fewer columns (bigger photos)
-      // Pinch in (zoom out) = more columns (smaller photos)
+      // Pinch out (zoom in) = fewer columns = lower preset index
       if (lastScale.current > 0.3) {
-        setColumns((c) => Math.max(MIN_COLUMNS, c - 1));
+        setPresetIndex((i) => Math.max(0, i - 1));
         lastScale.current = 0;
       } else if (lastScale.current < -0.3) {
-        setColumns((c) => Math.min(MAX_COLUMNS, c + 1));
+        setPresetIndex((i) => Math.min(SIZE_PRESETS.length - 1, i + 1));
         lastScale.current = 0;
       }
     },
     []
   );
 
-  return { columns, setColumns, onPinch, MIN_COLUMNS, MAX_COLUMNS };
+  return { columns, presetIndex, currentPreset, setPresetByIndex, onPinch, SIZE_PRESETS };
 }
