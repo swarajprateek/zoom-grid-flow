@@ -19,7 +19,9 @@ export const loadApiBaseUrl = async () => {
   }
 
   try {
-    const response = await fetch("/runtime-config.json", { cache: "no-store" });
+    const response = await fetch(`${import.meta.env.BASE_URL}runtime-config.json`, {
+      cache: "no-store",
+    });
     if (!response.ok) {
       cachedApiBaseUrl = fallbackApiBaseUrl;
       return cachedApiBaseUrl;
