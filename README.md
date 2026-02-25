@@ -64,9 +64,15 @@ This project is built with:
 
 This repo now includes a local backend that:
 
-- stores image files in `server/data/uploads`
-- stores metadata in SQLite at `server/data/photos.db`
+- authenticates users with login ID + password
+- stores each user's files in `server/data/users/<user-id>/uploads`
+- stores each user's metadata in `server/data/users/<user-id>/photos.db`
+- stores auth users in `server/data/users.db`
 - exposes a local proxy API on `http://localhost:4001` for frontend CRUD calls
+
+Users can:
+- sign in with existing credentials
+- create a new account from the frontend login screen
 
 ### Run locally
 
@@ -94,6 +100,10 @@ If needed, set these environment variables:
 - `PHOTO_SERVER_URL` (photo server URL, default `http://localhost:4000`)
 - `APP_ORIGIN` (single CORS origin, legacy)
 - `APP_ORIGINS` (comma-separated CORS origins, preferred)
+- `DEFAULT_USER_ID` (default login ID, default `admin`)
+- `DEFAULT_USER_PASSWORD` (default login password, default `admin123`)
+- `AUTH_SECRET` (token signing secret, set this in production)
+- `TOKEN_TTL_MS` (optional auth token TTL in milliseconds)
 
 ### Runtime API URL (single source of truth)
 

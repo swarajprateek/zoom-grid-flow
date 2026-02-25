@@ -24,16 +24,27 @@ app.use(
   })
 );
 
-const forwardJson = async (req, res, path, method) => {
+const getForwardHeaders = (req) => {
+  const headers = {};
+  if (req.headers["content-type"]) {
+    headers["content-type"] = req.headers["content-type"];
+  }
+  if (req.headers["content-length"]) {
+    headers["content-length"] = req.headers["content-length"];
+  }
+  if (req.headers.authorization) {
+    headers.authorization = req.headers.authorization;
+  }
+  return headers;
+};
+
+const forwardJson = async (req, res, method) => {
   try {
     const response = await axios({
       method,
-      url: `${PHOTO_SERVER_URL}${path}`,
-      data: req,
-      headers: {
-        "content-type": req.headers["content-type"],
-        "content-length": req.headers["content-length"],
-      },
+      url: `${PHOTO_SERVER_URL}${req.originalUrl}`,
+      data: method === "GET" || method === "DELETE" ? undefined : req,
+      headers: getForwardHeaders(req),
       maxBodyLength: Infinity,
       maxContentLength: Infinity,
       validateStatus: () => true,
@@ -44,15 +55,16 @@ const forwardJson = async (req, res, path, method) => {
     }
     res.status(response.status).send(response.data);
   } catch (error) {
-    console.error(`Proxy error [${method} ${path}]`, error.message);
+    console.error(`Proxy error [${method} ${req.originalUrl}]`, error.message);
     res.status(503).json({ error: "Database server is down" });
   }
 };
 
-const forwardDownload = async (req, res, path) => {
+const forwardDownload = async (req, res) => {
   try {
-    const response = await axios.get(`${PHOTO_SERVER_URL}${path}`, {
+    const response = await axios.get(`${PHOTO_SERVER_URL}${req.originalUrl}`, {
       responseType: "stream",
+      headers: getForwardHeaders(req),
       validateStatus: () => true,
     });
 
@@ -79,15 +91,16 @@ const forwardDownload = async (req, res, path) => {
 
     response.data.pipe(res);
   } catch (error) {
-    console.error(`Proxy error [GET ${path}]`, error.message);
+    console.error(`Proxy error [GET ${req.originalUrl}]`, error.message);
     res.status(503).json({ error: "Database server is down" });
   }
 };
 
-const forwardAsset = async (res, path) => {
+const forwardAsset = async (req, res) => {
   try {
-    const response = await axios.get(`${PHOTO_SERVER_URL}${path}`, {
+    const response = await axios.get(`${PHOTO_SERVER_URL}${req.originalUrl}`, {
       responseType: "stream",
+      headers: getForwardHeaders(req),
       validateStatus: () => true,
     });
 
@@ -101,34 +114,73 @@ const forwardAsset = async (res, path) => {
     }
     response.data.pipe(res);
   } catch (error) {
-    console.error(`Proxy error [GET ${path}]`, error.message);
+    console.error(`Proxy error [GET ${req.originalUrl}]`, error.message);
     res.status(503).json({ error: "Database server is down" });
   }
 };
 
 app.get("/api/photos", async (req, res) => {
-  await forwardJson(req, res, "/api/photos", "GET");
+  await forwardJson(req, res, "GET");
 });
 
 app.post("/api/photos", async (req, res) => {
-  await forwardJson(req, res, "/api/photos", "POST");
+  await forwardJson(req, res, "POST");
 });
 
 app.delete("/api/photos/:id", async (req, res) => {
-  await forwardJson(req, res, `/api/photos/${req.params.id}`, "DELETE");
+  await forwardJson(req, res, "DELETE");
 });
 
 app.get("/api/photos/:id/download", async (req, res) => {
-  await forwardDownload(req, res, `/api/photos/${req.params.id}/download`);
+  await forwardDownload(req, res);
 });
 
 // Backward-compatible image endpoint
 app.get("/api/images/:id", async (req, res) => {
-  await forwardDownload(req, res, `/api/photos/${req.params.id}/download`);
+  try {
+    const authQuery =
+      typeof req.query.auth === "string" && req.query.auth.trim()
+        ? `?auth=${encodeURIComponent(req.query.auth)}`
+        : "";
+    const response = await axios.get(
+      `${PHOTO_SERVER_URL}/api/photos/${req.params.id}/download${authQuery}`,
+      {
+        responseType: "stream",
+        headers: getForwardHeaders(req),
+        validateStatus: () => true,
+      }
+    );
+    if (response.status >= 400) {
+      res.status(response.status).json({ error: "Request failed" });
+      return;
+    }
+    if (response.headers["content-type"]) {
+      res.setHeader("Content-Type", response.headers["content-type"]);
+    }
+    if (response.headers["content-disposition"]) {
+      res.setHeader("Content-Disposition", response.headers["content-disposition"]);
+    }
+    response.data.pipe(res);
+  } catch (error) {
+    console.error(`Proxy error [GET /api/images/${req.params.id}]`, error.message);
+    res.status(503).json({ error: "Database server is down" });
+  }
 });
 
 app.get("/uploads/:filename", async (req, res) => {
-  await forwardAsset(res, `/uploads/${req.params.filename}`);
+  await forwardAsset(req, res);
+});
+
+app.post("/api/auth/login", async (req, res) => {
+  await forwardJson(req, res, "POST");
+});
+
+app.post("/api/auth/register", async (req, res) => {
+  await forwardJson(req, res, "POST");
+});
+
+app.get("/api/auth/me", async (req, res) => {
+  await forwardJson(req, res, "GET");
 });
 
 app.get("/api/health", async (_req, res) => {
