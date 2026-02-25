@@ -6,7 +6,7 @@ import { usePinchGrid, SIZE_PRESETS } from "@/hooks/usePinchGrid";
 import { cn } from "@/lib/utils";
 
 const PhotoLibrary: React.FC = () => {
-  const { photos, addPhotos, removePhoto, downloadPhoto } = usePhotoLibrary();
+  const { photos, addPhotos, removePhoto, downloadPhoto, isDatabaseDown, refreshPhotos } = usePhotoLibrary();
   const { columns, presetIndex, currentPreset, setPresetByIndex, onPinch } = usePinchGrid(1);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -155,6 +155,22 @@ const PhotoLibrary: React.FC = () => {
         onTouchEnd={handleTouchEnd}
         onWheel={handleWheel}
       >
+        {isDatabaseDown && (
+          <div className="mx-auto mb-4 flex max-w-7xl items-center justify-between rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <span>Database server is down. Start your local proxy/database service.</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                refreshPhotos().catch((error) => {
+                  console.error(error);
+                });
+              }}
+            >
+              Retry
+            </Button>
+          </div>
+        )}
         {photos.length === 0 ? (
           <div
             className="mx-auto flex max-w-md flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed border-muted-foreground/25 px-8 py-24 text-center"
