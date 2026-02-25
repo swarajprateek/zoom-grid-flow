@@ -95,6 +95,32 @@ If needed, set these environment variables:
 - `APP_ORIGIN` (single CORS origin, legacy)
 - `APP_ORIGINS` (comma-separated CORS origins, preferred)
 
+### Runtime API URL (single source of truth)
+
+Frontend reads API URL from `public/runtime-config.json` at runtime:
+
+```json
+{
+  "apiBaseUrl": "https://your-api-domain"
+}
+```
+
+If empty, frontend falls back to:
+- `VITE_API_BASE_URL` (if provided), else
+- `http(s)://<current-host>:4001`
+
+Update runtime config quickly:
+
+```sh
+npm run set:api-url -- https://your-api-domain
+```
+
+Auto-sync from latest Cloudflare quick tunnel URL in `tunnel.err.log`:
+
+```sh
+npm run sync:tunnel-url
+```
+
 ### Deployed frontend + local API via tunnel
 
 If your frontend is deployed publicly and your API runs on your PC:
@@ -127,7 +153,7 @@ This repo includes a workflow at `.github/workflows/deploy-pages.yml`.
 1. Push this repo to GitHub.
 2. In GitHub: `Settings -> Pages -> Build and deployment -> Source`, choose `GitHub Actions`.
 3. In GitHub: `Settings -> Secrets and variables -> Actions -> Variables`, add:
-   - `VITE_API_BASE_URL=https://<your-public-api-domain-or-tunnel>`
+   - `VITE_API_BASE_URL` is optional when `public/runtime-config.json` is used.
 
 ### Deploy
 

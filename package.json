@@ -12,6 +12,8 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
+    "set:api-url": "node scripts/set-runtime-api-url.mjs",
+    "sync:tunnel-url": "node scripts/sync-tunnel-url.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },

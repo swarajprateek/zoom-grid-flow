@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { getApiBaseUrlSync, loadApiBaseUrl } from "@/lib/runtimeConfig";
 
 export interface Photo {
   id: string;
@@ -9,23 +10,26 @@ export interface Photo {
   downloadUrl: string;
 }
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ??
-  `${window.location.protocol}//${window.location.hostname}:4001`;
+const toAbsoluteUrl = (apiBaseUrl: string, pathOrUrl: string) =>
+  pathOrUrl.startsWith("http") ? pathOrUrl : `${apiBaseUrl}${pathOrUrl}`;
 
-const toAbsoluteUrl = (pathOrUrl: string) =>
-  pathOrUrl.startsWith("http") ? pathOrUrl : `${API_BASE_URL}${pathOrUrl}`;
-
-const normalizePhoto = (photo: Photo): Photo => ({
+const normalizePhoto = (apiBaseUrl: string, photo: Photo): Photo => ({
   ...photo,
-  url: toAbsoluteUrl(photo.url),
-  thumbnailUrl: toAbsoluteUrl(photo.thumbnailUrl),
-  downloadUrl: toAbsoluteUrl(photo.downloadUrl),
+  url: toAbsoluteUrl(apiBaseUrl, photo.url),
+  thumbnailUrl: toAbsoluteUrl(apiBaseUrl, photo.thumbnailUrl),
+  downloadUrl: toAbsoluteUrl(apiBaseUrl, photo.downloadUrl),
 });
 
 export function usePhotoLibrary() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [isDatabaseDown, setIsDatabaseDown] = useState(false);
+  const [apiBaseUrl, setApiBaseUrl] = useState(getApiBaseUrlSync());
+
+  useEffect(() => {
+    loadApiBaseUrl().then(setApiBaseUrl).catch(() => {
+      // keep fallback if runtime config fails to load
+    });
+  }, []);
 
   const markHealthy = useCallback(() => {
     setIsDatabaseDown(false);
@@ -37,16 +41,16 @@ export function usePhotoLibrary() {
 
   const refreshPhotos = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/photos`);
+      const res = await fetch(`${apiBaseUrl}/api/photos`);
       if (!res.ok) throw new Error("Failed to load photos");
       const data = (await res.json()) as { photos: Photo[] };
-      setPhotos(data.photos.map(normalizePhoto));
+      setPhotos(data.photos.map((photo) => normalizePhoto(apiBaseUrl, photo)));
       markHealthy();
     } catch (error) {
       markDatabaseDown();
       throw error;
     }
-  }, [markDatabaseDown, markHealthy]);
+  }, [apiBaseUrl, markDatabaseDown, markHealthy]);
 
   useEffect(() => {
     refreshPhotos().catch((error) => {
@@ -62,7 +66,7 @@ export function usePhotoLibrary() {
     imageFiles.forEach((file) => body.append("photos", file));
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/photos`, {
+      const res = await fetch(`${apiBaseUrl}/api/photos`, {
         method: "POST",
         body,
       });
@@ -73,10 +77,10 @@ export function usePhotoLibrary() {
       markDatabaseDown();
       throw error;
     }
-  }, [markDatabaseDown, markHealthy, refreshPhotos]);
+  }, [apiBaseUrl, markDatabaseDown, markHealthy, refreshPhotos]);
 
   const removePhoto = useCallback((id: string) => {
-    fetch(`${API_BASE_URL}/api/photos/${id}`, { method: "DELETE" })
+    fetch(`${apiBaseUrl}/api/photos/${id}`, { method: "DELETE" })
       .then((res) => {
         if (!res.ok) throw new Error("Failed to delete photo");
         markHealthy();
@@ -86,7 +90,7 @@ export function usePhotoLibrary() {
         markDatabaseDown();
         console.error(error);
       });
-  }, [markDatabaseDown, markHealthy]);
+  }, [apiBaseUrl, markDatabaseDown, markHealthy]);
 
   const downloadPhoto = useCallback((photo: Photo) => {
     const a = document.createElement("a");
