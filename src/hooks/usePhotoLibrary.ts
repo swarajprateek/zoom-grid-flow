@@ -40,6 +40,13 @@ const withTokenInUrl = (url: string, authToken: string | null) => {
   return nextUrl.toString();
 };
 
+const isLikelyImageFile = (file: File) => {
+  if (file.type.startsWith("image/")) {
+    return true;
+  }
+  return /\.(png|jpe?g|webp|gif|bmp|svg|heic|heif|avif)$/i.test(file.name);
+};
+
 const normalizePhoto = (apiBaseUrl: string, authToken: string | null, photo: Photo): Photo => {
   const url = toAbsoluteUrl(apiBaseUrl, photo.url);
   const thumbnailUrl = toAbsoluteUrl(apiBaseUrl, photo.thumbnailUrl);
@@ -151,8 +158,11 @@ export function usePhotoLibrary() {
   }, [refreshPhotos]);
 
   const addPhotos = useCallback(async (files: FileList | File[]) => {
-    const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
-    if (!imageFiles.length) return;
+    const imageFiles = Array.from(files).filter(isLikelyImageFile);
+    if (!imageFiles.length) {
+      setAuthError("No valid image files selected.");
+      return;
+    }
 
     const body = new FormData();
     imageFiles.forEach((file) => body.append("photos", file));
@@ -166,11 +176,24 @@ export function usePhotoLibrary() {
         clearAuth();
         throw new Error("Session expired. Please log in again.");
       }
-      if (!res.ok) throw new Error("Failed to upload photos");
+      if (!res.ok) {
+        const payload = (await res.json().catch(() => ({}))) as { error?: string };
+        const errorMessage = payload.error || "Failed to upload photos";
+        if (res.status >= 500) {
+          markDatabaseDown();
+        } else {
+          markHealthy();
+        }
+        throw new Error(errorMessage);
+      }
       markHealthy();
+      setAuthNotice(`${imageFiles.length} photo${imageFiles.length > 1 ? "s" : ""} uploaded successfully.`);
       await refreshPhotos();
     } catch (error) {
-      markDatabaseDown();
+      if (error instanceof Error && error.message.toLowerCase().includes("failed to fetch")) {
+        markDatabaseDown();
+      }
+      setAuthError(error instanceof Error ? error.message : "Failed to upload photos.");
       throw error;
     }
   }, [apiBaseUrl, authorizedFetch, clearAuth, markDatabaseDown, markHealthy, refreshPhotos]);
@@ -182,15 +205,24 @@ export function usePhotoLibrary() {
           clearAuth();
           throw new Error("Session expired. Please log in again.");
         }
-        if (!res.ok) throw new Error("Failed to delete photo");
+        if (!res.ok) {
+          if (res.status >= 500) {
+            markDatabaseDown();
+          } else {
+            markHealthy();
+          }
+          throw new Error("Failed to delete photo");
+        }
         markHealthy();
-        setPhotos((prev) => prev.filter((photo) => photo.id !== id));
+        return refreshPhotos();
       })
       .catch((error) => {
-        markDatabaseDown();
+        if (error instanceof Error && error.message.toLowerCase().includes("failed to fetch")) {
+          markDatabaseDown();
+        }
         console.error(error);
       });
-  }, [apiBaseUrl, authorizedFetch, clearAuth, markDatabaseDown, markHealthy]);
+  }, [apiBaseUrl, authorizedFetch, clearAuth, markDatabaseDown, markHealthy, refreshPhotos]);
 
   const login = useCallback(
     async (loginId: string, password: string) => {

@@ -34,6 +34,7 @@ const PhotoLibrary: React.FC = () => {
   const [loggingIn, setLoggingIn] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [formError, setFormError] = useState<string | null>(null);
+  const [failedPreviewIds, setFailedPreviewIds] = useState<Set<string>>(new Set());
 
   const flashIndicator = useCallback(() => {
     setShowSizeIndicator(true);
@@ -348,12 +349,27 @@ const PhotoLibrary: React.FC = () => {
                 className="group relative aspect-square cursor-pointer overflow-hidden rounded-md bg-muted transition-shadow"
                 onClick={() => setViewingPhoto(photo)}
               >
-                <img
-                  src={photo.thumbnailUrl}
-                  alt={photo.name}
-                  className="h-full w-full object-cover"
-                  loading="lazy"
-                />
+                {!failedPreviewIds.has(photo.id) ? (
+                  <img
+                    src={photo.thumbnailUrl}
+                    alt={photo.name}
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                    onError={() => {
+                      setFailedPreviewIds((prev) => {
+                        const next = new Set(prev);
+                        next.add(photo.id);
+                        return next;
+                      });
+                    }}
+                  />
+                ) : (
+                  <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-muted p-3 text-center">
+                    <ImageIcon className="h-8 w-8 text-muted-foreground/70" />
+                    <p className="line-clamp-2 text-xs text-muted-foreground">{photo.name}</p>
+                    <p className="text-[11px] text-muted-foreground/80">Preview not supported here</p>
+                  </div>
+                )}
                 <div className="absolute inset-0 flex items-end justify-end gap-1 bg-gradient-to-t from-black/50 to-transparent p-2 opacity-0 transition-opacity group-hover:opacity-100">
                   <Button
                     variant="ghost"

@@ -271,9 +271,22 @@ const createStoreForUser = (userId) => {
       SELECT filename
       FROM photos
     `),
+    listPhotosForConversion: db.prepare(`
+      SELECT id, name, filename, mime_type, size, created_at
+      FROM photos
+      WHERE lower(filename) LIKE '%.heic' OR lower(filename) LIKE '%.heif'
+    `),
     deletePhoto: db.prepare(`
       DELETE FROM photos
       WHERE id = ?
+    `),
+    updatePhotoAfterConversion: db.prepare(`
+      UPDATE photos
+      SET name = @name,
+          filename = @filename,
+          mime_type = @mime_type,
+          size = @size
+      WHERE id = @id
     `),
   };
 };
@@ -304,7 +317,11 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage,
   fileFilter: (_req, file, cb) => {
-    if (!file.mimetype.startsWith("image/")) {
+    const byMime = file.mimetype.startsWith("image/");
+    const byExtension = /\.(png|jpe?g|webp|gif|bmp|svg|heic|heif|avif)$/i.test(
+      file.originalname || ""
+    );
+    if (!byMime && !byExtension) {
       cb(new Error("Only image files are allowed"));
       return;
     }
@@ -319,6 +336,28 @@ const thumbnailFilenameFromOriginal = (filename) => {
 
 const thumbnailPathFromOriginal = (uploadsDir, filename) =>
   path.join(uploadsDir, thumbnailFilenameFromOriginal(filename));
+
+const isHeicLike = (filename, mimeType = "") =>
+  /\.(heic|heif)$/i.test(filename || "") || /image\/hei(c|f)/i.test(mimeType || "");
+
+const replaceFileExtension = (filename, nextExtension) => {
+  const parsed = path.parse(filename);
+  return `${parsed.name}${nextExtension}`;
+};
+
+const replaceDisplayExtension = (name, nextExtension) => {
+  if (/\.[^.]+$/.test(name)) {
+    return name.replace(/\.[^.]+$/, nextExtension);
+  }
+  return `${name}${nextExtension}`;
+};
+
+const convertImageToJpeg = async (sourcePath, targetPath) => {
+  await sharp(sourcePath)
+    .rotate()
+    .jpeg({ quality: 88, mozjpeg: true })
+    .toFile(targetPath);
+};
 
 const ensureThumbnail = async (uploadsDir, filename) => {
   const sourcePath = path.join(uploadsDir, filename);
@@ -350,16 +389,80 @@ const backfillThumbnails = async (store) => {
   }
 };
 
-const photoToResponse = (store, photo) => ({
-  id: photo.id,
-  name: photo.name,
-  url: `/uploads/${photo.filename}`,
-  thumbnailUrl: fs.existsSync(thumbnailPathFromOriginal(store.uploadsDir, photo.filename))
+const convertStoredHeicToJpeg = async (store, photo) => {
+  const oldFilename = photo.filename;
+  const oldPath = path.join(store.uploadsDir, oldFilename);
+  if (!fs.existsSync(oldPath)) {
+    return null;
+  }
+
+  const newFilename = replaceFileExtension(oldFilename, ".jpg");
+  const newPath = path.join(store.uploadsDir, newFilename);
+
+  await convertImageToJpeg(oldPath, newPath);
+
+  const oldThumbnailPath = thumbnailPathFromOriginal(store.uploadsDir, oldFilename);
+  if (fs.existsSync(oldThumbnailPath)) {
+    fs.unlinkSync(oldThumbnailPath);
+  }
+  fs.unlinkSync(oldPath);
+
+  try {
+    await ensureThumbnail(store.uploadsDir, newFilename);
+  } catch (error) {
+    console.warn(`Thumbnail generation skipped for converted file ${newFilename}: ${error.message}`);
+  }
+
+  const updatedSize = fs.statSync(newPath).size;
+  const nextName = replaceDisplayExtension(photo.name, ".jpg");
+
+  store.updatePhotoAfterConversion.run({
+    id: photo.id,
+    name: nextName,
+    filename: newFilename,
+    mime_type: "image/jpeg",
+    size: updatedSize,
+  });
+
+  return { oldFilename, newFilename };
+};
+
+const migrateHeicPhotosToJpeg = async (store, userId) => {
+  const rows = store.listPhotosForConversion.all();
+  for (const row of rows) {
+    try {
+      const converted = await convertStoredHeicToJpeg(store, row);
+      if (converted) {
+        console.log(`Converted ${userId}: ${converted.oldFilename} -> ${converted.newFilename}`);
+      }
+    } catch (error) {
+      console.warn(`Failed HEIC conversion for ${userId}/${row.filename}: ${error.message}`);
+    }
+  }
+};
+
+const withAuthQuery = (pathValue, authToken) => {
+  if (!authToken) {
+    return pathValue;
+  }
+  const separator = pathValue.includes("?") ? "&" : "?";
+  return `${pathValue}${separator}auth=${encodeURIComponent(authToken)}`;
+};
+
+const photoToResponse = (store, photo, authToken) => {
+  const baseThumbnail = fs.existsSync(thumbnailPathFromOriginal(store.uploadsDir, photo.filename))
     ? `/uploads/${thumbnailFilenameFromOriginal(photo.filename)}`
-    : `/uploads/${photo.filename}`,
-  addedAt: photo.created_at,
-  downloadUrl: `/api/photos/${photo.id}/download`,
-});
+    : `/uploads/${photo.filename}`;
+
+  return {
+    id: photo.id,
+    name: photo.name,
+    url: withAuthQuery(`/uploads/${photo.filename}`, authToken),
+    thumbnailUrl: withAuthQuery(baseThumbnail, authToken),
+    addedAt: photo.created_at,
+    downloadUrl: withAuthQuery(`/api/photos/${photo.id}/download`, authToken),
+  };
+};
 
 app.post("/api/auth/login", (req, res) => {
   const loginId = typeof req.body?.loginId === "string" ? req.body.loginId.trim() : "";
@@ -465,8 +568,14 @@ app.get("/api/health", (_req, res) => {
 
 app.get("/api/photos", requireAuth, (req, res) => {
   const store = getUserStore(req.authUserId);
-  const photos = store.listPhotos.all().map((photo) => photoToResponse(store, photo));
-  res.json({ photos });
+  const photos = store.listPhotos.all().map((photo) => photoToResponse(store, photo, req.authToken));
+  res.json({
+    user: {
+      id: req.authUserId,
+      storageFolder: `users/${req.authUserId}`,
+    },
+    photos,
+  });
 });
 
 app.post("/api/photos", requireAuth, upload.array("photos"), async (req, res, next) => {
@@ -478,26 +587,63 @@ app.post("/api/photos", requireAuth, upload.array("photos"), async (req, res, ne
 
     for (const file of files) {
       const id = randomUUID();
+      let storedFilename = file.filename;
+      let storedMimeType = file.mimetype;
+      let storedSize = file.size;
+      let storedName = file.originalname;
+
+      if (isHeicLike(file.originalname, file.mimetype)) {
+        const sourcePath = path.join(store.uploadsDir, file.filename);
+        const convertedFilename = replaceFileExtension(file.filename, ".jpg");
+        const convertedPath = path.join(store.uploadsDir, convertedFilename);
+        try {
+          await convertImageToJpeg(sourcePath, convertedPath);
+          fs.unlinkSync(sourcePath);
+          storedFilename = convertedFilename;
+          storedMimeType = "image/jpeg";
+          storedSize = fs.statSync(convertedPath).size;
+          storedName = replaceDisplayExtension(file.originalname, ".jpg");
+        } catch (error) {
+          if (fs.existsSync(sourcePath)) {
+            fs.unlinkSync(sourcePath);
+          }
+          throw new Error(
+            `HEIC conversion failed for '${file.originalname}'. Install HEIF/HEIC support on this server.`
+          );
+        }
+      }
+
       store.insertPhoto.run({
         id,
-        name: file.originalname,
-        filename: file.filename,
-        mime_type: file.mimetype,
-        size: file.size,
+        name: storedName,
+        filename: storedFilename,
+        mime_type: storedMimeType,
+        size: storedSize,
         created_at: now,
       });
-      await ensureThumbnail(store.uploadsDir, file.filename);
+      try {
+        await ensureThumbnail(store.uploadsDir, storedFilename);
+      } catch (error) {
+        // Keep upload successful even if thumbnail generation is unsupported.
+        console.warn(`Thumbnail generation skipped for ${file.filename}: ${error.message}`);
+      }
       created.push(
         photoToResponse(store, {
           id,
-          name: file.originalname,
-          filename: file.filename,
+          name: storedName,
+          filename: storedFilename,
           created_at: now,
-        })
+        }, req.authToken)
       );
     }
 
-    res.status(201).json({ photos: created });
+    res.status(201).json({
+      user: {
+        id: req.authUserId,
+        storageFolder: `users/${req.authUserId}`,
+      },
+      photos: created,
+    });
   } catch (error) {
     next(error);
   }
@@ -562,9 +708,11 @@ app.listen(PORT, () => {
   const users = listUsersStmt.all();
   for (const user of users) {
     const store = getUserStore(user.id);
-    backfillThumbnails(store).catch((error) => {
-      console.warn(`Thumbnail backfill failed for ${user.id}: ${error.message}`);
-    });
+    migrateHeicPhotosToJpeg(store, user.id)
+      .then(() => backfillThumbnails(store))
+      .catch((error) => {
+        console.warn(`Startup media migration failed for ${user.id}: ${error.message}`);
+      });
   }
   console.log(`Local photo server running on http://localhost:${PORT}`);
   console.log(`Users path: ${usersDir}`);
