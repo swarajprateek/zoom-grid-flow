@@ -144,12 +144,19 @@ const LandingPage: React.FC<LandingPageProps> = ({
   };
 
   return (
-    <div className="relative flex min-h-screen flex-col bg-background overflow-hidden">
+    <div className="relative flex min-h-screen flex-col overflow-hidden" style={{ background: "var(--gradient-hero)" }}>
+      {/* Animated background orbs */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-secondary/20 blur-3xl animate-pulse" />
+        <div className="absolute -right-20 top-1/3 h-80 w-80 rounded-full bg-accent/20 blur-3xl animate-pulse" style={{ animationDelay: "1s" }} />
+        <div className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-primary/20 blur-3xl animate-pulse" style={{ animationDelay: "2s" }} />
+      </div>
+
       {/* Top navigation */}
-      <nav className="sticky top-0 z-50 flex items-center justify-between border-b bg-background/90 px-6 py-3 backdrop-blur-md">
+      <nav className="sticky top-0 z-50 flex items-center justify-between border-b border-primary-foreground/10 bg-primary-foreground/10 px-6 py-3 backdrop-blur-xl">
         <div className="flex items-center gap-2">
-          <Cloud className="h-6 w-6 text-primary" />
-          <span className="text-lg font-bold tracking-tight text-foreground">
+          <Cloud className="h-6 w-6 text-primary-foreground" />
+          <span className="text-lg font-bold tracking-tight text-primary-foreground">
             Swaraj Cloud
           </span>
         </div>
@@ -157,6 +164,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
           {!showSignIn && !showRegister && (
             <Button
               size="sm"
+              className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 shadow-lg"
               onClick={() => {
                 setShowSignIn(true);
                 setShowRegister(false);
@@ -171,6 +179,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
             <Button
               variant="ghost"
               size="sm"
+              className="text-primary-foreground hover:bg-primary-foreground/10"
               onClick={() => {
                 setShowSignIn(false);
                 setShowRegister(false);
@@ -185,7 +194,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
       </nav>
 
       {/* Main content area */}
-      <div className="flex flex-1">
+      <div className="relative flex flex-1">
         {/* Left side – hero slides (always visible) */}
         <div
           className={cn(
@@ -194,10 +203,12 @@ const LandingPage: React.FC<LandingPageProps> = ({
           )}
         >
           <div className="flex flex-col items-center gap-6 text-center">
-            <Cloud className="h-20 w-20 text-primary opacity-20" />
+            <div className="rounded-2xl bg-primary-foreground/10 p-5 backdrop-blur-sm">
+              <Cloud className="h-16 w-16 text-primary-foreground" />
+            </div>
             <h1
               className={cn(
-                "text-4xl font-extrabold tracking-tight text-foreground transition-all duration-500 md:text-5xl lg:text-6xl",
+                "text-4xl font-extrabold tracking-tight text-primary-foreground transition-all duration-500 md:text-5xl lg:text-6xl drop-shadow-lg",
                 slideVisible
                   ? "opacity-100 translate-y-0"
                   : "opacity-0 translate-y-4"
@@ -205,15 +216,28 @@ const LandingPage: React.FC<LandingPageProps> = ({
             >
               {SLIDES[slideIndex]}
             </h1>
-            <p className="max-w-lg text-muted-foreground">
+            <p className="max-w-lg text-lg text-primary-foreground/70">
               Your personal cloud storage — fast, free, and fully under your
               control.
             </p>
+            {/* Slide dots */}
+            <div className="flex gap-2">
+              {SLIDES.map((_, i) => (
+                <div
+                  key={i}
+                  className={cn(
+                    "h-2 rounded-full transition-all duration-300",
+                    i === slideIndex
+                      ? "w-8 bg-primary-foreground"
+                      : "w-2 bg-primary-foreground/30"
+                  )}
+                />
+              ))}
+            </div>
             {!showSignIn && !showRegister && (
               <Button
                 size="lg"
-                variant="outline"
-                className="mt-4 gap-2"
+                className="mt-4 gap-2 bg-primary-foreground text-primary shadow-xl hover:bg-primary-foreground/90 hover:scale-105 transition-transform"
                 onClick={() => {
                   setShowRegister(true);
                   setShowSignIn(false);
@@ -229,13 +253,14 @@ const LandingPage: React.FC<LandingPageProps> = ({
 
         {/* Sign-in dropdown (small overlay from top-right) */}
         {showSignIn && (
-          <div className="absolute right-6 top-16 z-40 w-80 animate-fade-in">
+          <div className="absolute right-6 top-4 z-40 w-80 animate-fade-in">
             <form
               onSubmit={handleSignIn}
               className={cn(
-                "rounded-xl border bg-card p-5 shadow-xl space-y-3",
+                "rounded-2xl border border-primary-foreground/10 p-5 space-y-3 backdrop-blur-xl",
                 shaking && "animate-shake"
               )}
+              style={{ background: "var(--gradient-card)", boxShadow: "var(--shadow-glow)" }}
             >
               <h2 className="text-lg font-semibold text-foreground">Sign In</h2>
               <div className="space-y-1.5">
@@ -246,6 +271,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
                   onChange={(e) => setLoginId(e.target.value)}
                   placeholder="your username"
                   autoComplete="username"
+                  className="border-primary/20 focus-visible:ring-primary"
                 />
               </div>
               <div className="space-y-1.5">
@@ -257,21 +283,22 @@ const LandingPage: React.FC<LandingPageProps> = ({
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   autoComplete="current-password"
+                  className="border-primary/20 focus-visible:ring-primary"
                 />
               </div>
               {formError && (
                 <p className="text-sm text-destructive">{formError}</p>
               )}
               {authNotice && !formError && (
-                <p className="text-sm text-primary">{authNotice}</p>
+                <p className="text-sm text-secondary">{authNotice}</p>
               )}
-              <Button className="w-full" type="submit" disabled={loading}>
+              <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90" type="submit" disabled={loading}>
                 {loading ? "Signing in..." : "Sign In"}
               </Button>
               <Button
                 type="button"
                 variant="ghost"
-                className="w-full text-sm"
+                className="w-full text-sm text-muted-foreground hover:text-foreground"
                 onClick={() => {
                   setShowSignIn(false);
                   setShowRegister(true);
@@ -279,7 +306,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
                   resetForm();
                 }}
               >
-                New user? <span className="font-semibold text-primary ml-1">Create Account</span>
+                New user? <span className="font-semibold text-accent ml-1">Create Account</span>
               </Button>
             </form>
           </div>
@@ -287,17 +314,18 @@ const LandingPage: React.FC<LandingPageProps> = ({
 
         {/* Register panel (right 2/3 of screen) */}
         {showRegister && (
-          <div className="flex w-2/3 items-center justify-center border-l bg-card/50 px-8 animate-slide-in-right">
+          <div className="flex w-2/3 items-center justify-center border-l border-primary-foreground/10 bg-primary-foreground/5 px-8 backdrop-blur-md animate-slide-in-right">
             <form
               onSubmit={handleRegister}
               className={cn(
-                "w-full max-w-md space-y-5 rounded-2xl border bg-card p-8 shadow-2xl",
+                "w-full max-w-md space-y-5 rounded-2xl border border-primary-foreground/10 p-8",
                 shaking && "animate-shake"
               )}
+              style={{ background: "var(--gradient-card)", boxShadow: "var(--shadow-glow)" }}
             >
               <div>
                 <h2 className="text-3xl font-extrabold text-foreground">
-                  Create <span className="text-primary">New Account</span>
+                  Create <span className="text-accent">New Account</span>
                 </h2>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Your photos, your cloud, your rules.
@@ -312,6 +340,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
                   onChange={(e) => setLoginId(e.target.value)}
                   placeholder="choose a username"
                   autoComplete="username"
+                  className="border-primary/20 focus-visible:ring-accent"
                 />
               </div>
               <div className="space-y-1.5">
@@ -324,6 +353,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="min 6 characters"
                   autoComplete="new-password"
+                  className="border-primary/20 focus-visible:ring-accent"
                 />
               </div>
               <div className="space-y-1.5">
@@ -336,21 +366,22 @@ const LandingPage: React.FC<LandingPageProps> = ({
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="re-enter password"
                   autoComplete="new-password"
+                  className="border-primary/20 focus-visible:ring-accent"
                 />
               </div>
               {formError && (
                 <p className="text-sm text-destructive">{formError}</p>
               )}
               {authNotice && !formError && (
-                <p className="text-sm text-primary">{authNotice}</p>
+                <p className="text-sm text-secondary">{authNotice}</p>
               )}
-              <Button className="w-full" type="submit" disabled={loading}>
+              <Button className="w-full bg-accent text-accent-foreground hover:bg-accent/90" type="submit" disabled={loading}>
                 {loading ? "Creating account..." : "Create Account"}
               </Button>
               <Button
                 type="button"
                 variant="ghost"
-                className="w-full text-sm"
+                className="w-full text-sm text-primary-foreground/70 hover:text-foreground"
                 onClick={() => {
                   setShowRegister(false);
                   setShowSignIn(true);
