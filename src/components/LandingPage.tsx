@@ -145,12 +145,8 @@ const LandingPage: React.FC<LandingPageProps> = ({
 
   return (
     <div className="relative flex min-h-screen flex-col overflow-hidden" style={{ background: "var(--gradient-hero)" }}>
-      {/* Animated background orbs */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-secondary/20 blur-3xl animate-pulse" />
-        <div className="absolute -right-20 top-1/3 h-80 w-80 rounded-full bg-accent/20 blur-3xl animate-pulse" style={{ animationDelay: "1s" }} />
-        <div className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-primary/20 blur-3xl animate-pulse" style={{ animationDelay: "2s" }} />
-      </div>
+      {/* Subtle background texture */}
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_hsl(215_20%_25%_/_0.15),_transparent_60%)]" />
 
       {/* Top navigation */}
       <nav className="sticky top-0 z-50 flex items-center justify-between border-b border-primary-foreground/10 bg-primary-foreground/10 px-6 py-3 backdrop-blur-xl">
@@ -203,12 +199,12 @@ const LandingPage: React.FC<LandingPageProps> = ({
           )}
         >
           <div className="flex flex-col items-center gap-6 text-center">
-            <div className="rounded-2xl bg-primary-foreground/10 p-5 backdrop-blur-sm">
-              <Cloud className="h-16 w-16 text-primary-foreground" />
+            <div className="rounded-2xl bg-primary-foreground/10 p-5">
+              <Cloud className="h-16 w-16 text-primary-foreground/80" />
             </div>
             <h1
               className={cn(
-                "text-4xl font-extrabold tracking-tight text-primary-foreground transition-all duration-500 md:text-5xl lg:text-6xl drop-shadow-lg",
+                "text-4xl font-extrabold tracking-tight text-primary-foreground transition-all duration-500 md:text-5xl lg:text-6xl",
                 slideVisible
                   ? "opacity-100 translate-y-0"
                   : "opacity-0 translate-y-4"
@@ -216,7 +212,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
             >
               {SLIDES[slideIndex]}
             </h1>
-            <p className="max-w-lg text-lg text-primary-foreground/70">
+            <p className="max-w-lg text-primary-foreground/60">
               Your personal cloud storage — fast, free, and fully under your
               control.
             </p>
@@ -237,7 +233,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
             {!showSignIn && !showRegister && (
               <Button
                 size="lg"
-                className="mt-4 gap-2 bg-primary-foreground text-primary shadow-xl hover:bg-primary-foreground/90 hover:scale-105 transition-transform"
+                className="mt-4 gap-2 bg-primary-foreground text-primary hover:bg-primary-foreground/90 transition-colors"
                 onClick={() => {
                   setShowRegister(true);
                   setShowSignIn(false);
@@ -306,7 +302,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
                   resetForm();
                 }}
               >
-                New user? <span className="font-semibold text-accent ml-1">Create Account</span>
+                New user? <span className="font-semibold text-primary ml-1">Create Account</span>
               </Button>
             </form>
           </div>
@@ -325,7 +321,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
             >
               <div>
                 <h2 className="text-3xl font-extrabold text-foreground">
-                  Create <span className="text-accent">New Account</span>
+                  Create <span className="text-primary">New Account</span>
                 </h2>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Your photos, your cloud, your rules.
@@ -340,7 +336,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
                   onChange={(e) => setLoginId(e.target.value)}
                   placeholder="choose a username"
                   autoComplete="username"
-                  className="border-primary/20 focus-visible:ring-accent"
+                  className="border-primary/20 focus-visible:ring-primary"
                 />
               </div>
               <div className="space-y-1.5">
@@ -353,7 +349,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="min 6 characters"
                   autoComplete="new-password"
-                  className="border-primary/20 focus-visible:ring-accent"
+                  className="border-primary/20 focus-visible:ring-primary"
                 />
               </div>
               <div className="space-y-1.5">
@@ -366,7 +362,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="re-enter password"
                   autoComplete="new-password"
-                  className="border-primary/20 focus-visible:ring-accent"
+                  className="border-primary/20 focus-visible:ring-primary"
                 />
               </div>
               {formError && (
@@ -375,7 +371,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
               {authNotice && !formError && (
                 <p className="text-sm text-secondary">{authNotice}</p>
               )}
-              <Button className="w-full bg-accent text-accent-foreground hover:bg-accent/90" type="submit" disabled={loading}>
+              <Button className="w-full" type="submit" disabled={loading}>
                 {loading ? "Creating account..." : "Create Account"}
               </Button>
               <Button
