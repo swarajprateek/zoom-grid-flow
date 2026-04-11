@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import multer from "multer";
 import Database from "better-sqlite3";
 import sharp from "sharp";
+import heicConvert from "heic-convert";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -353,10 +354,20 @@ const replaceDisplayExtension = (name, nextExtension) => {
 };
 
 const convertImageToJpeg = async (sourcePath, targetPath) => {
-  await sharp(sourcePath)
-    .rotate()
-    .jpeg({ quality: 88, mozjpeg: true })
-    .toFile(targetPath);
+  const inputBuffer = fs.readFileSync(sourcePath);
+  try {
+    const outputBuffer = await heicConvert({
+      buffer: inputBuffer,
+      format: "JPEG",
+      quality: 0.88,
+    });
+    fs.writeFileSync(targetPath, outputBuffer);
+  } catch {
+    await sharp(sourcePath)
+      .rotate()
+      .jpeg({ quality: 88, mozjpeg: true })
+      .toFile(targetPath);
+  }
 };
 
 const ensureThumbnail = async (uploadsDir, filename) => {

@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { execSync } from "node:child_process";
 
 const logPath = path.resolve("tunnel.err.log");
 
@@ -24,4 +25,14 @@ fs.writeFileSync(
   "utf8"
 );
 
-console.log(`Updated ${targetPath} to ${latest}`);
+console.log(`✅ Updated ${targetPath} to ${latest}`);
+
+// Git commit and push
+try {
+  execSync("git add public/runtime-config.json", { stdio: "inherit" });
+  execSync(`git commit -m "chore: update tunnel URL to ${latest}"`, { stdio: "inherit" });
+  execSync("git push", { stdio: "inherit" });
+  console.log(`🚀 Pushed runtime-config.json to repo — frontend will pick up new tunnel URL.`);
+} catch (err) {
+  console.warn("⚠️  Git push failed (maybe nothing to commit, or no remote set up):", err.message);
+}
