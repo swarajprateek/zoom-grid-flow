@@ -2,7 +2,7 @@
  * One command to rule them all:
  *   node scripts/start.mjs
  *
- * 1. Starts cloudflared tunnel → http://localhost:4001
+ * 1. Starts cloudflared tunnel → http://localhost:4001 (forced http2, avoids UDP/QUIC blocks)
  * 2. Waits for tunnel URL
  * 3. Writes public/runtime-config.json
  * 4. Git commits + pushes config
@@ -44,11 +44,11 @@ const spawnLogged = (label, cmd, args, env = {}) => {
 };
 
 // ── Step 1: Clear old log and start cloudflared ──────────────────────────────
-console.log("🚇 Starting Cloudflare tunnel → http://localhost:4001 ...");
+console.log("🚇 Starting Cloudflare tunnel → http://localhost:4001 (protocol: http2) ...");
 if (fs.existsSync(LOG_PATH)) fs.writeFileSync(LOG_PATH, "");
 
 const logStream = fs.createWriteStream(LOG_PATH, { flags: "a" });
-const cf = spawn("cloudflared", ["tunnel", "--url", "http://localhost:4001"], {
+const cf = spawn("cloudflared", ["tunnel", "--protocol", "http2", "--url", "http://localhost:4001"], {
   stdio: ["ignore", "ignore", "pipe"],
 });
 cf.stderr.pipe(logStream);

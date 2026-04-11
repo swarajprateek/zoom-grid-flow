@@ -16,11 +16,11 @@ const pollIntervalMs = 500;
 // Clear old log so we don't pick up a stale URL
 if (fs.existsSync(logPath)) fs.writeFileSync(logPath, "");
 
-console.log("🚇 Starting Cloudflare tunnel on http://localhost:4001...");
+console.log("🚇 Starting Cloudflare tunnel on http://localhost:4001 (protocol: http2)...");
 
-// Start cloudflared, pipe stderr to tunnel.err.log
+// Start cloudflared with http2 to avoid UDP/QUIC blocks
 const logStream = fs.createWriteStream(logPath, { flags: "a" });
-const cf = spawn("cloudflared", ["tunnel", "--url", "http://localhost:4001"], {
+const cf = spawn("cloudflared", ["tunnel", "--protocol", "http2", "--url", "http://localhost:4001"], {
   stdio: ["ignore", "ignore", "pipe"],
 });
 cf.stderr.pipe(logStream);
@@ -68,9 +68,9 @@ try {
   execSync("git add public/runtime-config.json", { stdio: "inherit" });
   execSync(`git commit -m "chore: update tunnel URL to ${url}"`, { stdio: "inherit" });
   execSync("git push", { stdio: "inherit" });
-  console.log("🚀 Pushed to repo — deployed frontend will now use the new tunnel URL!");
+  console.log(`🚀 Pushed to repo — deployed frontend will now use the new tunnel URL!`);
 } catch (err) {
-  console.warn("⚠️  Git push failed (maybe nothing changed, or no remote):", err.message);
+  console.warn("⚠️  Git push failed (maybe nothing to commit, or no remote set up):", err.message);
 }
 
 console.log("\n🟢 Tunnel is running. Press Ctrl+C to stop.\n");
