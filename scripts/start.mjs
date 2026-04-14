@@ -49,8 +49,9 @@ if (fs.existsSync(LOG_PATH)) fs.writeFileSync(LOG_PATH, "");
 
 const logStream = fs.createWriteStream(LOG_PATH, { flags: "a" });
 const cf = spawn("cloudflared", ["tunnel", "--protocol", "http2", "--url", "http://localhost:4001"], {
-  stdio: ["ignore", "ignore", "pipe"],
+  stdio: ["ignore", "pipe", "pipe"],
 });
+cf.stdout.pipe(logStream);
 cf.stderr.pipe(logStream);
 cf.on("error", (err) => {
   console.error("❌ cloudflared failed to start:", err.message);

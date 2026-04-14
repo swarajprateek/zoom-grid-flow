@@ -21,8 +21,9 @@ console.log("🚇 Starting Cloudflare tunnel on http://localhost:4001 (protocol:
 // Start cloudflared with http2 to avoid UDP/QUIC blocks
 const logStream = fs.createWriteStream(logPath, { flags: "a" });
 const cf = spawn("cloudflared", ["tunnel", "--protocol", "http2", "--url", "http://localhost:4001"], {
-  stdio: ["ignore", "ignore", "pipe"],
+  stdio: ["ignore", "pipe", "pipe"],
 });
+cf.stdout.pipe(logStream);
 cf.stderr.pipe(logStream);
 
 cf.on("error", (err) => {
